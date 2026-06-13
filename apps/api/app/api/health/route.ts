@@ -29,7 +29,7 @@ export async function GET() {
         supabase: 'connected',
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Health check endpoint error:', err);
     return NextResponse.json(
       {
