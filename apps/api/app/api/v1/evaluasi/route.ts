@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createSupabaseUserClient } from '@/lib/supabase';
+import { supabase, createSupabaseUserClient } from '@/lib/supabase';
 
 const SECURITY_HEADERS = {
   'X-Frame-Options': 'DENY',
@@ -24,6 +24,18 @@ const VALID_KATEGORI = [
   'jasa_konsultasi',
   'alat_tulis_kantor',
 ] as const;
+
+const postBodySchema = z.object({
+  judul:                z.string().min(1).max(255),
+  kategori:             z.enum(VALID_KATEGORI),
+  deskripsi:            z.string().min(1).max(5000),
+  budgetMin:            z.number().int().positive().optional().nullable(),
+  budgetMax:            z.number().int().positive(),
+  deadline:             z.string().min(1),
+  prioritasKriteria:    z.array(z.string()).optional().nullable(),
+  lampiranUrl:          z.string().optional().nullable(),
+  preferensiPerusahaan: z.string().optional().nullable(),
+});
 
 const querySchema = z.object({
   status:   z.enum(VALID_STATUS).optional(),
@@ -124,6 +136,91 @@ export async function GET(request: Request) {
 
   } catch (err) {
     console.error('Error in GET /evaluasi:', err);
+    return NextResponse.json(
+      { success: false, error: { code: 'INTERNAL_SERVER_ERROR', message: 'Terjadi kesalahan internal pada server' } },
+      { status: 500, headers: SECURITY_HEADERS }
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/v1/evaluasi
+// ---------------------------------------------------------------------------
+export async function POST(request: Request) {
+  try {
+    const userId = request.headers.get('x-user-id');
+    const token  = request.headers.get('x-user-token');
+
+    if (!userId || !token) {
+      return NextResponse.json(
+        { success: false, error: { code: 'UNAUTHORIZED', message: 'Autentikasi diperlukan' } },
+        { status: 401, headers: SECURITY_HEADERS }
+      );
+    }
+
+    const body   = await request.json();
+    const parsed = postBodySchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code:    'VALIDATION_ERROR',
+            message: 'Input tidak valid',
+            details: parsed.error.format(),
+          },
+        },
+        { status: 400, headers: SECURITY_HEADERS }
+      );
+    }
+
+    const {
+      judul, kategori, deskripsi, budgetMin, budgetMax,
+      deadline, prioritasKriteria, lampiranUrl, preferensiPerusahaan,
+    } = parsed.data;
+
+    if (preferensiPerusahaan && preferensiPerusahaan.length > 1000) {
+      return NextResponse.json(
+        { success: false, error: { code: 'PREFERENCE_TOO_LONG', message: 'Teks preferensi perusahaan tidak boleh lebih dari 1.000 karakter' } },
+        { status: 400, headers: SECURITY_HEADERS }
+      );
+    }
+
+    // Use service role — manual auth already verified. created_by is set to auth'd user.
+    const { data, error } = await supabase
+      .from('evaluasi')
+      .insert({
+        judul,
+        kategori,
+        deskripsi,
+        status:               'draft',
+        budget_min:           budgetMin ?? null,
+        budget_max:           budgetMax,
+        deadline,
+        prioritas_kriteria:   prioritasKriteria ?? null,
+        lampiran_url:         lampiranUrl ?? null,
+        preferensi_perusahaan: preferensiPerusahaan ?? null,
+        created_by:           userId,
+      })
+      .select('id, judul, kategori, deskripsi, status, budget_min, budget_max, deadline, prioritas_kriteria, lampiran_url, preferensi_perusahaan, created_by, created_at, updated_at')
+      .single();
+
+    if (error || !data) {
+      console.error('Error creating evaluasi:', error);
+      return NextResponse.json(
+        { success: false, error: { code: 'INTERNAL_SERVER_ERROR', message: 'Gagal membuat evaluasi' } },
+        { status: 500, headers: SECURITY_HEADERS }
+      );
+    }
+
+    return NextResponse.json(
+      { success: true, data },
+      { status: 201, headers: SECURITY_HEADERS }
+    );
+
+  } catch (err) {
+    console.error('Error in POST /evaluasi:', err);
     return NextResponse.json(
       { success: false, error: { code: 'INTERNAL_SERVER_ERROR', message: 'Terjadi kesalahan internal pada server' } },
       { status: 500, headers: SECURITY_HEADERS }
