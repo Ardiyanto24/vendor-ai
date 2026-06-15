@@ -9,7 +9,7 @@ interface AuthState {
   avatarUrl: string | null;
   isAuthenticated: boolean;
   accessToken: string | null;
-  setUser: (user: Partial<User> & { accessToken?: string }) => void;
+  setUser: (user: Partial<User> & { avatarUrl?: string | null; accessToken?: string }) => void;
   clearUser: () => void;
 }
 
@@ -26,7 +26,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     nama: user.nama ?? state.nama,
     email: user.email ?? state.email,
     role: user.role ?? state.role,
-    avatarUrl: user.avatar_url ?? state.avatarUrl,
+    avatarUrl: user.avatarUrl ?? user.avatar_url ?? state.avatarUrl,
     isAuthenticated: true,
     accessToken: user.accessToken ?? state.accessToken,
   })),
