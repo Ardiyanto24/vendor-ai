@@ -60,6 +60,7 @@ export async function apiFetch<T>(path: string, options: FetchOptions = {}): Pro
   }
 
   const response = await fetch(url, {
+    credentials: 'include',
     ...options,
     headers,
   });
@@ -83,6 +84,7 @@ export async function apiFetch<T>(path: string, options: FetchOptions = {}): Pro
           const refreshResponse = await fetch(`${baseUrl}/api/v1/auth/refresh`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
           });
           if (refreshResponse.ok) {
             const data = await refreshResponse.json();
@@ -93,7 +95,11 @@ export async function apiFetch<T>(path: string, options: FetchOptions = {}): Pro
               isRefreshing = false;
               // Retry current request
               headers.set('Authorization', `Bearer ${newToken}`);
-              const retryResponse = await fetch(url, { ...options, headers });
+              const retryResponse = await fetch(url, {
+                credentials: 'include',
+                ...options,
+                headers,
+              });
               if (retryResponse.ok) {
                 const result = await retryResponse.json();
                 return (result.success ? result.data : result) as T;
@@ -112,7 +118,11 @@ export async function apiFetch<T>(path: string, options: FetchOptions = {}): Pro
           subscribeTokenRefresh(async (newToken) => {
             try {
               headers.set('Authorization', `Bearer ${newToken}`);
-              const retryResponse = await fetch(url, { ...options, headers });
+              const retryResponse = await fetch(url, {
+                credentials: 'include',
+                ...options,
+                headers,
+              });
               if (retryResponse.ok) {
                 const result = await retryResponse.json();
                 resolve((result.success ? result.data : result) as T);

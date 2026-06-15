@@ -5,15 +5,35 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
+function corsResponse(response: NextResponse, origin: string) {
+  response.headers.set('Access-Control-Allow-Origin', origin);
+  response.headers.set('Access-Control-Allow-Credentials', 'true');
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
+  const origin = request.headers.get('origin') || 'http://localhost:3000';
+
+  // Handle preflight requests
+  if (request.method === 'OPTIONS') {
+    return new NextResponse(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Credentials': 'true',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-user-id, x-user-role, x-user-token',
+      },
+    });
+  }
 
   // 1. Exclude public and auth endpoints
   if (
     path.startsWith('/api/health') ||
     path.startsWith('/api/v1/auth')
   ) {
-    return NextResponse.next();
+    return corsResponse(NextResponse.next(), origin);
   }
 
   // 2. Read token from cookie or Authorization header
@@ -25,7 +45,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (!token) {
-    return NextResponse.json(
+    return corsResponse(NextResponse.json(
       {
         success: false,
         error: {
@@ -41,7 +61,7 @@ export async function middleware(request: NextRequest) {
           'Referrer-Policy': 'strict-origin-when-cross-origin',
         },
       }
-    );
+    ), origin);
   }
 
   // 3. Verify token with Supabase Auth
@@ -55,7 +75,7 @@ export async function middleware(request: NextRequest) {
   const { data: { user }, error } = await supabase.auth.getUser(token);
 
   if (error || !user) {
-    return NextResponse.json(
+    return corsResponse(NextResponse.json(
       {
         success: false,
         error: {
@@ -71,7 +91,7 @@ export async function middleware(request: NextRequest) {
           'Referrer-Policy': 'strict-origin-when-cross-origin',
         },
       }
-    );
+    ), origin);
   }
 
   const role = user.user_metadata?.role || 'staff';
@@ -82,7 +102,7 @@ export async function middleware(request: NextRequest) {
     path.endsWith('/approval');
 
   if (isManagerOnlyRoute && role !== 'manager') {
-    return NextResponse.json(
+    return corsResponse(NextResponse.json(
       {
         success: false,
         error: {
@@ -98,7 +118,7 @@ export async function middleware(request: NextRequest) {
           'Referrer-Policy': 'strict-origin-when-cross-origin',
         },
       }
-    );
+    ), origin);
   }
 
   // 5. Forward user info in request headers to API handlers
@@ -107,13 +127,14 @@ export async function middleware(request: NextRequest) {
   requestHeaders.set('x-user-role', role);
   requestHeaders.set('x-user-token', token); // Also forward the token so handler can construct createSupabaseUserClient
 
-  return NextResponse.next({
+  return corsResponse(NextResponse.next({
     request: {
       headers: requestHeaders,
     },
-  });
+  }), origin);
 }
 
 export const config = {
   matcher: ['/api/v1/:path*'],
 };
+
