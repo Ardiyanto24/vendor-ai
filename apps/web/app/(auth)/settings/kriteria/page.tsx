@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useAuthStore } from '../../../stores/authStore';
+import { useAuthStore } from '@/stores/authStore';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Settings } from 'lucide-react';
 

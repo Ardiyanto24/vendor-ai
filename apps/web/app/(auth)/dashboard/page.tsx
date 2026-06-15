@@ -1,10 +1,10 @@
 'use client';
 
 import React from 'react';
-import { useAuthStore } from '../../../stores/authStore';
-import { logoutUser } from '../../../lib/api/auth';
+import { useAuthStore } from '@/stores/authStore';
+import { logoutUser } from '@/lib/api/auth';
 import { useRouter } from 'next/navigation';
-import { LogOut, Shield, User } from 'lucide-react';
+import { LogOut, Shield } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
