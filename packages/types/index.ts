@@ -73,18 +73,29 @@ export interface Vendor {
 }
 
 // Konfigurasi Kriteria
-export interface Kriteria {
-  nama: string;
+export type KategoriPengadaan =
+  | 'it_hardware'
+  | 'it_software'
+  | 'jasa_it'
+  | 'jasa_konsultasi'
+  | 'alat_tulis_kantor';
+
+export interface KategoriPengadaanOption {
+  value: KategoriPengadaan;
+  label: string;
+}
+
+export interface KriteriaItem {
+  key: string;
+  label: string;
   bobot: number;
-  deskripsi?: string;
+  threshold_min: number;
 }
 
 export interface KonfigurasiKriteria {
   id: string;
-  kategori: string;
-  kriteria: Kriteria[];
+  kategori: KategoriPengadaan;
+  kriteria: KriteriaItem[];
   updated_by: string;
-  created_at: string;
   updated_at: string;
-  deleted_at?: string | null;
 }
