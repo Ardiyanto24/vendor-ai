@@ -19,7 +19,7 @@ Kolom `AI` diisi hanya untuk fitur yang menyentuh `vendor-ai-agent` — isi `—
 | F-01 Auth & Login | ✅ | ✅ | ✅ | — | |
 | F-02 Layout & AppShell | — | — | ✅ | — | FE only |
 | F-03 Konfigurasi Kriteria | ✅ | ✅ | ✅ | — | |
-| F-04 Dashboard | — | — | — | — | |
+| F-04 Dashboard | ✅ | — | — | — | |
 | F-05 Riwayat Evaluasi | — | — | — | — | |
 | F-06 Buat Evaluasi | — | — | — | — | |
 | F-07 Upload & Ekstraksi | — | — | — | — | Koordinasi AI Engineer |
