@@ -153,12 +153,17 @@ export const handlers = [
     const page     = parseInt(url.searchParams.get('page')  ?? '1',  10);
     const limit    = parseInt(url.searchParams.get('limit') ?? '20', 10);
 
+    const dateFrom = url.searchParams.get('dateFrom');
+    const dateTo   = url.searchParams.get('dateTo');
+
     let filtered = [...MOCK_EVALUASI];
     if (status)   filtered = filtered.filter(e => e.status === status);
     if (kategori) filtered = filtered.filter(e => e.kategori === kategori);
     if (search)   filtered = filtered.filter(e =>
       e.judul.toLowerCase().includes(search.toLowerCase())
     );
+    if (dateFrom) filtered = filtered.filter(e => e.created_at >= dateFrom);
+    if (dateTo)   filtered = filtered.filter(e => e.created_at <= dateTo);
 
     const total      = filtered.length;
     const totalPages = Math.ceil(total / limit) || 1;
