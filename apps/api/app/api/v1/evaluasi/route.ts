@@ -89,7 +89,7 @@ export async function GET(request: Request) {
         { count: 'exact' }
       )
       .is('deleted_at', null)
-      .order('created_at', { ascending: false })
+      .order('updated_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (status)   query = query.eq('status', status);
