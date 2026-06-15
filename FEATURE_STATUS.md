@@ -16,7 +16,7 @@ Kolom `AI` diisi hanya untuk fitur yang menyentuh `vendor-ai-agent` — isi `—
 | Fitur | DB | BE | FE | AI | Notes |
 |---|---|---|---|---|---|
 | F-00 Environment Setup | ✅ | ✅ | ✅ | - | |
-| F-01 Auth & Login | ✅ | — | — | — | |
+| F-01 Auth & Login | ✅ | ✅ | — | — | |
 | F-02 Layout & AppShell | — | — | — | — | FE only |
 | F-03 Konfigurasi Kriteria | — | — | — | — | |
 | F-04 Dashboard | — | — | — | — | |
