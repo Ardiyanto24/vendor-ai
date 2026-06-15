@@ -114,8 +114,10 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         success: true,
-        data: data ?? [],
-        meta: { page, limit, total, totalPages },
+        data: {
+          items: data ?? [],
+          meta: { page, limit, total, totalPages },
+        },
       },
       { status: 200, headers: SECURITY_HEADERS }
     );
