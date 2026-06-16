@@ -99,3 +99,27 @@ export interface KonfigurasiKriteria {
   updated_by: string;
   updated_at: string;
 }
+
+export interface EvaluasiDetail extends Evaluasi {
+  vendors: Vendor[];
+}
+
+export interface CreateEvaluasiPayload {
+  judul: string;
+  kategori: string;
+  deskripsi: string;
+  budgetMin?: number;
+  budgetMax: number;
+  deadline: string;
+  prioritasKriteria?: string[];
+  lampiranUrl?: string;
+  preferensiPerusahaan?: string;
+}
+
+export interface AddVendorPayload {
+  namaPerusahaan: string;
+  kontakAtauWebsite?: string;
+  hargaPenawaran: number;
+  catatan?: string;
+  sumberInput: 'manual' | 'extracted';
+}

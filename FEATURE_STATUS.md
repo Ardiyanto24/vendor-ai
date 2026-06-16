@@ -21,7 +21,7 @@ Kolom `AI` diisi hanya untuk fitur yang menyentuh `vendor-ai-agent` — isi `—
 | F-03 Konfigurasi Kriteria | ✅ | ✅ | ✅ | — | |
 | F-04 Dashboard | ✅ | ✅ | ✅ | — | |
 | F-05 Riwayat Evaluasi | ✅ | ✅ | ✅ | — | |
-| F-06 Buat Evaluasi | ✅ | ✅ | — | — | |
+| F-06 Buat Evaluasi | ✅ | ✅ | ✅ | — | |
 | F-07 Upload & Ekstraksi | — | — | — | — | Koordinasi AI Engineer |
 | F-08 Form Preferensi | — | — | — | — | |
 | F-09 Submit & Approval | — | — | — | — | |

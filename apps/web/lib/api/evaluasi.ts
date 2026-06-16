@@ -1,5 +1,12 @@
 import { apiFetch } from './client';
-import type { Evaluasi, EvaluasiStatus } from 'types';
+import type {
+  Evaluasi,
+  EvaluasiDetail,
+  EvaluasiStatus,
+  CreateEvaluasiPayload,
+  AddVendorPayload,
+  Vendor,
+} from 'types';
 
 export interface EvaluasiListFilters {
   status?: EvaluasiStatus;
@@ -48,4 +55,35 @@ export async function getEvaluasiList(filters: EvaluasiListFilters = {}): Promis
 
 export async function getEvaluasiSummary(): Promise<EvaluasiSummary> {
   return apiFetch<EvaluasiSummary>('/api/v1/evaluasi/summary');
+}
+
+export async function createEvaluasi(payload: CreateEvaluasiPayload): Promise<Evaluasi> {
+  return apiFetch<Evaluasi>('/api/v1/evaluasi', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getEvaluasiDetail(id: string): Promise<EvaluasiDetail> {
+  return apiFetch<EvaluasiDetail>(`/api/v1/evaluasi/${id}`);
+}
+
+export async function addVendor(evaluasiId: string, payload: AddVendorPayload): Promise<Vendor> {
+  return apiFetch<Vendor>(`/api/v1/evaluasi/${evaluasiId}/vendor`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function removeVendor(evaluasiId: string, vendorId: string): Promise<void> {
+  await apiFetch<void>(`/api/v1/evaluasi/${evaluasiId}/vendor/${vendorId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function submitEvaluasi(evaluasiId: string): Promise<{ evaluasiId: string; message: string }> {
+  return apiFetch<{ evaluasiId: string; message: string }>(
+    `/api/v1/evaluasi/${evaluasiId}/submit`,
+    { method: 'POST' }
+  );
 }
