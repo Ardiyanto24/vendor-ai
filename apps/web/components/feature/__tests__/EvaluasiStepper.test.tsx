@@ -133,6 +133,27 @@ describe('EvaluasiStepper', () => {
     expect(screen.getByRole('heading', { name: 'Tambah Vendor' })).toBeInTheDocument();
   });
 
+  test('step 1: renders PreferenceInput textarea with counter, and it is optional', async () => {
+    renderStepper();
+
+    expect(
+      screen.getByText('Preferensi atau Prioritas Perusahaan (opsional)')
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('preferensi-counter')).toHaveTextContent('0/1000');
+
+    // Step 1 can be submitted without touching the preference field.
+    await goToStep2();
+    expect(screen.getByTestId('step-2-content')).toBeInTheDocument();
+  });
+
+  test('step 1: typing in PreferenceInput updates the character counter', async () => {
+    renderStepper();
+
+    await userEvent.type(screen.getByTestId('preferensi-input'), 'Utamakan vendor lokal');
+
+    expect(screen.getByTestId('preferensi-counter')).toHaveTextContent('21/1000');
+  });
+
   test('step 1 data persists when user navigates back from step 2', async () => {
     renderStepper();
 
@@ -150,6 +171,7 @@ describe('EvaluasiStepper', () => {
     );
     await userEvent.type(screen.getByPlaceholderText('100000000'), '200000000');
     await userEvent.type(screen.getByTestId('deadline-input'), '2026-10-01');
+    await userEvent.type(screen.getByTestId('preferensi-input'), 'Vendor lokal saja');
 
     await userEvent.click(screen.getByRole('button', { name: /lanjut/i }));
     await waitFor(() => expect(screen.getByTestId('step-2-content')).toBeInTheDocument());
@@ -159,6 +181,7 @@ describe('EvaluasiStepper', () => {
 
     expect(screen.getByDisplayValue('Pengadaan Server 2026')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Software akuntansi')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Vendor lokal saja')).toBeInTheDocument();
   });
 
   test('step 2: shows "Tambah Vendor Manual" button', async () => {

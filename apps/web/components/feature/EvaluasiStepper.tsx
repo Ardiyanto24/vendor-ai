@@ -18,6 +18,7 @@ import {
 } from '@/lib/api/evaluasi';
 import VendorInputCard from '@/components/composite/VendorInputCard';
 import UploadVendorCard from '@/components/composite/UploadVendorCard';
+import PreferenceInput from '@/components/feature/PreferenceInput';
 
 interface Step1FormData {
   judul: string;
@@ -27,6 +28,7 @@ interface Step1FormData {
   budget_max: string;
   deadline: string;
   lampiran_url: string;
+  preferensi_perusahaan: string;
 }
 
 const STEP_LABELS = ['Requirement', 'Tambah Vendor', 'Konfirmasi'] as const;
@@ -107,7 +109,7 @@ export default function EvaluasiStepper() {
   const [generalError,    setGeneralError]    = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { register, trigger, getValues, formState: { errors } } = useForm<Step1FormData>({
+  const { register, trigger, getValues, watch, setValue, formState: { errors } } = useForm<Step1FormData>({
     mode: 'onTouched',
     defaultValues: {
       judul:        '',
@@ -117,8 +119,11 @@ export default function EvaluasiStepper() {
       budget_max:   '',
       deadline:     '',
       lampiran_url: '',
+      preferensi_perusahaan: '',
     },
   });
+
+  const preferensiValue = watch('preferensi_perusahaan');
 
   const { data: kategoriOptions = [] } = useQuery({
     queryKey:  ['kategori-pengadaan'],
@@ -181,6 +186,7 @@ export default function EvaluasiStepper() {
         budgetMax:  parseInt(values.budget_max, 10),
         deadline:   values.deadline,
         lampiranUrl: values.lampiran_url || undefined,
+        preferensiPerusahaan: values.preferensi_perusahaan || undefined,
       });
       setEvaluasiId(newEval.id);
     }
@@ -386,6 +392,12 @@ export default function EvaluasiStepper() {
                 className={INPUT_CLASS}
               />
             </div>
+
+            {/* Preferensi perusahaan */}
+            <PreferenceInput
+              value={preferensiValue}
+              onChange={(v) => setValue('preferensi_perusahaan', v)}
+            />
           </div>
 
           <div className="flex justify-end pt-2">
@@ -554,6 +566,14 @@ export default function EvaluasiStepper() {
                 </p>
               </div>
             </div>
+            {step1Values.preferensi_perusahaan && (
+              <div className="px-4 py-3">
+                <p className="text-xs text-gray-400">Preferensi Perusahaan</p>
+                <p className="text-sm text-white mt-0.5 whitespace-pre-wrap">
+                  {step1Values.preferensi_perusahaan}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Vendor list */}

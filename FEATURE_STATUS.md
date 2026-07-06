@@ -23,7 +23,7 @@ Kolom `AI` diisi hanya untuk fitur yang menyentuh `vendor-ai-agent` — isi `—
 | F-05 Riwayat Evaluasi | ✅ | ✅ | ✅ | — | |
 | F-06 Buat Evaluasi | ✅ | ✅ | ✅ | — | |
 | F-07 Upload & Ekstraksi | ✅ | ✅ | 🔄 | ✅ | FE selesai & diverifikasi via MSW (unit + manual), belum di-switch ke staging API nyata |
-| F-08 Form Preferensi | — | — | — | — | |
+| F-08 Form Preferensi | ✅ | ✅ | 🔄 | — | DB (kolom `preferensi_perusahaan`) & BE (validasi `PREFERENCE_TOO_LONG`) sudah ada sejak F-04/F-06; FE `PreferenceInput` baru ditambahkan, diverifikasi via unit test (MSW), belum di-switch ke staging API nyata |
 | F-09 Submit & Approval | — | — | — | — | |
 | F-10 AI Processing | — | — | — | — | Koordinasi AI Engineer |
 | F-11 Hasil TOPSIS | — | — | — | — | Koordinasi AI Engineer |
