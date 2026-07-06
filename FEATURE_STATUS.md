@@ -22,7 +22,7 @@ Kolom `AI` diisi hanya untuk fitur yang menyentuh `vendor-ai-agent` — isi `—
 | F-04 Dashboard | ✅ | ✅ | ✅ | — | |
 | F-05 Riwayat Evaluasi | ✅ | ✅ | ✅ | — | |
 | F-06 Buat Evaluasi | ✅ | ✅ | ✅ | — | |
-| F-07 Upload & Ekstraksi | ✅ | ✅ | — | — | Koordinasi AI Engineer |
+| F-07 Upload & Ekstraksi | ✅ | ✅ | 🔄 | ✅ | FE selesai & diverifikasi via MSW (unit + manual), belum di-switch ke staging API nyata |
 | F-08 Form Preferensi | — | — | — | — | |
 | F-09 Submit & Approval | — | — | — | — | |
 | F-10 AI Processing | — | — | — | — | Koordinasi AI Engineer |

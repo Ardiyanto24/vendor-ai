@@ -6,6 +6,8 @@ import type {
   CreateEvaluasiPayload,
   AddVendorPayload,
   Vendor,
+  UploadDokumenResponse,
+  DokumenStatusResponse,
 } from 'types';
 
 export interface EvaluasiListFilters {
@@ -85,5 +87,29 @@ export async function submitEvaluasi(evaluasiId: string): Promise<{ evaluasiId: 
   return apiFetch<{ evaluasiId: string; message: string }>(
     `/api/v1/evaluasi/${evaluasiId}/submit`,
     { method: 'POST' }
+  );
+}
+
+export async function uploadDokumen(
+  evaluasiId: string,
+  file: File,
+  namaVendorHint?: string
+): Promise<UploadDokumenResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+  if (namaVendorHint) formData.append('namaVendorHint', namaVendorHint);
+
+  return apiFetch<UploadDokumenResponse>(`/api/v1/evaluasi/${evaluasiId}/dokumen`, {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+export async function getDokumenStatus(
+  evaluasiId: string,
+  uploadId: string
+): Promise<DokumenStatusResponse> {
+  return apiFetch<DokumenStatusResponse>(
+    `/api/v1/evaluasi/${evaluasiId}/dokumen/${uploadId}/status`
   );
 }

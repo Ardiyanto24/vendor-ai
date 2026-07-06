@@ -1,12 +1,14 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Trash2, Save, X, Building2 } from 'lucide-react';
+import { Trash2, Save, X, Building2, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { clsx } from 'clsx';
-import type { Vendor, AddVendorPayload } from 'types';
+import type { Vendor, AddVendorPayload, HasilEkstraksi, IndexingRagStatus } from 'types';
 
 export type VendorMode = 'manual' | 'extracted' | 'loading' | 'error';
+
+const LOW_CONFIDENCE_THRESHOLD = 0.6;
 
 interface VendorFormData {
   nama_perusahaan: string;
@@ -20,6 +22,15 @@ export interface VendorInputCardProps {
   mode: VendorMode;
   onRemove: () => void;
   onSave: (data: AddVendorPayload) => Promise<void>;
+  /** Mode `loading` — nama file yang sedang diekstrak. */
+  fileName?: string;
+  /** Mode `extracted` — hasil ekstraksi AI untuk pre-fill form. */
+  hasilEkstraksi?: HasilEkstraksi | null;
+  confidenceScore?: number | null;
+  indexingRagStatus?: IndexingRagStatus | null;
+  /** Mode `error` — pesan error dan fallback ke input manual. */
+  errorMessage?: string;
+  onRetryManual?: () => void;
 }
 
 const formatIDR = (value: number) =>
@@ -36,19 +47,46 @@ const INPUT_ERROR_CLASS =
   'w-full px-3 py-2 rounded-lg text-sm text-white bg-white/[0.04] border border-red-500/60 ' +
   'outline-none focus:border-red-500/40 placeholder-gray-600';
 
-export default function VendorInputCard({ vendor, mode, onRemove, onSave }: VendorInputCardProps) {
+function buildDefaultValues(hasilEkstraksi?: HasilEkstraksi | null): VendorFormData {
+  return {
+    nama_perusahaan: hasilEkstraksi?.nama_perusahaan.nilai ?? '',
+    kontak_atau_website: hasilEkstraksi?.kontak.nilai ?? '',
+    harga_penawaran:
+      hasilEkstraksi?.harga_penawaran.nilai != null ? String(hasilEkstraksi.harga_penawaran.nilai) : '',
+    catatan: hasilEkstraksi?.catatan_ekstraksi ?? '',
+  };
+}
+
+export default function VendorInputCard({
+  vendor,
+  mode,
+  onRemove,
+  onSave,
+  fileName,
+  hasilEkstraksi,
+  confidenceScore,
+  indexingRagStatus,
+  errorMessage,
+  onRetryManual,
+}: VendorInputCardProps) {
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<VendorFormData>({
-    defaultValues: {
-      nama_perusahaan: '',
-      kontak_atau_website: '',
-      harga_penawaran: '',
-      catatan: '',
-    },
+    defaultValues: buildDefaultValues(mode === 'extracted' ? hasilEkstraksi : null),
   });
+
+  // Pre-fill the form once extraction results arrive — useForm's defaultValues
+  // are only read on first render, so a later transition to `extracted` needs
+  // an explicit reset.
+  useEffect(() => {
+    if (mode === 'extracted' && hasilEkstraksi) {
+      reset(buildDefaultValues(hasilEkstraksi));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasilEkstraksi]);
 
   async function onSubmit(data: VendorFormData) {
     await onSave({
@@ -90,13 +128,99 @@ export default function VendorInputCard({ vendor, mode, onRemove, onSave }: Vend
     );
   }
 
-  // Edit mode — empty form for manual input
+  // Mode: loading — AI sedang mengekstrak dokumen
+  if (mode === 'loading') {
+    return (
+      <div
+        data-testid="vendor-card-loading"
+        className="px-4 py-4 rounded-xl border border-blue-500/20 bg-white/[0.02] space-y-3"
+      >
+        <div className="flex items-center gap-3">
+          <Loader2 className="w-4 h-4 text-blue-400 shrink-0 animate-spin" />
+          <div className="min-w-0">
+            <p className="text-sm text-white">AI sedang membaca dokumen...</p>
+            {fileName && <p className="text-xs text-gray-500 truncate mt-0.5">{fileName}</p>}
+          </div>
+        </div>
+        <div className="space-y-2">
+          <div className="h-3 rounded bg-white/10 w-3/4 animate-pulse" />
+          <div className="h-3 rounded bg-white/10 w-1/2 animate-pulse" />
+          <div className="h-3 rounded bg-white/10 w-2/3 animate-pulse" />
+        </div>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10
+            text-xs text-gray-400 hover:text-white hover:border-white/20 transition-colors"
+        >
+          <X className="w-3.5 h-3.5" />
+          Batal
+        </button>
+      </div>
+    );
+  }
+
+  // Mode: error — ekstraksi gagal atau timeout
+  if (mode === 'error') {
+    return (
+      <div
+        data-testid="vendor-card-error"
+        className="px-4 py-4 rounded-xl border border-red-500/30 bg-red-500/5 space-y-3"
+      >
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+          <p className="text-sm text-red-300">{errorMessage ?? 'Ekstraksi dokumen gagal.'}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onRetryManual}
+            data-testid="btn-input-manual"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500
+              text-xs text-white font-medium transition-colors"
+          >
+            Input Manual
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10
+              text-xs text-gray-400 hover:text-white hover:border-white/20 transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+            Hapus
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Mode: manual (empty form) or extracted (pre-filled, editable form)
+  const isExtracted = mode === 'extracted';
+  const isLowConfidence =
+    isExtracted && (confidenceScore ?? hasilEkstraksi?.confidence_overall ?? 1) < LOW_CONFIDENCE_THRESHOLD;
+  const isIndexing = isExtracted && (indexingRagStatus === 'pending' || indexingRagStatus === 'processing');
+  const isIndexed = isExtracted && indexingRagStatus === 'done';
+
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
       data-testid="vendor-input-form"
-      className="px-4 py-4 rounded-xl border border-blue-500/30 bg-white/[0.02] space-y-3"
+      className={clsx(
+        'px-4 py-4 rounded-xl border bg-white/[0.02] space-y-3',
+        isExtracted ? 'border-emerald-500/30' : 'border-blue-500/30'
+      )}
     >
+      {isLowConfidence && (
+        <div
+          data-testid="low-confidence-indicator"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-400"
+        >
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+          Harap verifikasi hasil ini — tingkat kepercayaan ekstraksi rendah
+        </div>
+      )}
+
       {/* Nama perusahaan */}
       <div>
         <label className="block text-xs text-gray-400 mb-1">
@@ -165,6 +289,30 @@ export default function VendorInputCard({ vendor, mode, onRemove, onSave }: Vend
         />
       </div>
 
+      {(isIndexing || isIndexed) && (
+        <div
+          data-testid="rag-indexing-indicator"
+          className={clsx(
+            'flex items-center gap-2 px-3 py-2 rounded-lg text-xs',
+            isIndexing
+              ? 'bg-blue-500/10 border border-blue-500/20 text-blue-300'
+              : 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+          )}
+        >
+          {isIndexing ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" />
+              Mengindeks dokumen untuk AI Chat...
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+              Dokumen terindeks untuk AI Chat
+            </>
+          )}
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex items-center gap-2 pt-1">
         <button
@@ -174,7 +322,7 @@ export default function VendorInputCard({ vendor, mode, onRemove, onSave }: Vend
             disabled:opacity-50 disabled:cursor-not-allowed text-xs text-white font-medium transition-colors"
         >
           <Save className="w-3.5 h-3.5" />
-          {isSubmitting ? 'Menyimpan...' : 'Simpan'}
+          {isSubmitting ? 'Menyimpan...' : isExtracted ? 'Konfirmasi' : 'Simpan'}
         </button>
         <button
           type="button"

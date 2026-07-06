@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { Check, ChevronRight, Building2, Plus, Send } from 'lucide-react';
+import { Check, ChevronRight, Building2, Plus, Send, Upload } from 'lucide-react';
 import { clsx } from 'clsx';
 import type { Vendor, AddVendorPayload } from 'types';
 import { getKategoriPengadaan } from '@/lib/api/konfigurasi';
@@ -14,8 +14,10 @@ import {
   addVendor,
   removeVendor,
   submitEvaluasi,
+  uploadDokumen,
 } from '@/lib/api/evaluasi';
 import VendorInputCard from '@/components/composite/VendorInputCard';
+import UploadVendorCard from '@/components/composite/UploadVendorCard';
 
 interface Step1FormData {
   judul: string;
@@ -28,6 +30,10 @@ interface Step1FormData {
 }
 
 const STEP_LABELS = ['Requirement', 'Tambah Vendor', 'Konfirmasi'] as const;
+
+type PendingEntry =
+  | { kind: 'manual'; localId: string }
+  | { kind: 'upload'; localId: string; fileName: string; uploadId: string | null; uploadError: string | null };
 
 const INPUT_CLASS =
   'w-full px-3 py-2 rounded-lg text-sm text-white bg-white/[0.04] border border-white/10 ' +
@@ -95,10 +101,11 @@ export default function EvaluasiStepper() {
   const router      = useRouter();
   const queryClient = useQueryClient();
 
-  const [step,           setStep]           = useState(1);
-  const [evaluasiId,     setEvaluasiId]     = useState<string | null>(null);
-  const [pendingFormIds, setPendingFormIds] = useState<string[]>([]);
-  const [generalError,   setGeneralError]   = useState<string | null>(null);
+  const [step,            setStep]            = useState(1);
+  const [evaluasiId,      setEvaluasiId]      = useState<string | null>(null);
+  const [pendingEntries,  setPendingEntries]  = useState<PendingEntry[]>([]);
+  const [generalError,    setGeneralError]    = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { register, trigger, getValues, formState: { errors } } = useForm<Step1FormData>({
     mode: 'onTouched',
@@ -142,6 +149,10 @@ export default function EvaluasiStepper() {
     onSuccess:  () => queryClient.invalidateQueries({ queryKey: ['evaluasi', evaluasiId] }),
   });
 
+  const uploadDokumenMutation = useMutation({
+    mutationFn: (file: File) => uploadDokumen(evaluasiId!, file),
+  });
+
   const submitMutation = useMutation({
     mutationFn: () => submitEvaluasi(evaluasiId!),
     onSuccess:  () => {
@@ -180,19 +191,58 @@ export default function EvaluasiStepper() {
   // Step 2 — vendor management
   // ---------------------------------------------------------------------------
   function addPendingForm() {
-    setPendingFormIds(prev => [...prev, `pending-${Date.now()}-${Math.random()}`]);
+    setPendingEntries(prev => [...prev, { kind: 'manual', localId: `pending-${Date.now()}-${Math.random()}` }]);
+  }
+
+  function handleFileSelected(file: File) {
+    const localId = `upload-${Date.now()}-${Math.random()}`;
+    setPendingEntries(prev => [
+      ...prev,
+      { kind: 'upload', localId, fileName: file.name, uploadId: null, uploadError: null },
+    ]);
+
+    uploadDokumenMutation.mutate(file, {
+      onSuccess: (res) => {
+        setPendingEntries(prev =>
+          prev.map(entry =>
+            entry.kind === 'upload' && entry.localId === localId
+              ? { ...entry, uploadId: res.uploadId }
+              : entry
+          )
+        );
+      },
+      onError: (err: Error) => {
+        setPendingEntries(prev =>
+          prev.map(entry =>
+            entry.kind === 'upload' && entry.localId === localId
+              ? { ...entry, uploadError: err.message || 'Gagal mengunggah dokumen' }
+              : entry
+          )
+        );
+      },
+    });
+  }
+
+  function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) handleFileSelected(file);
+    e.target.value = '';
   }
 
   async function handleSaveVendor(localId: string, payload: AddVendorPayload) {
     await addVendorMutation.mutateAsync(payload);
-    setPendingFormIds(prev => prev.filter(id => id !== localId));
+    setPendingEntries(prev => prev.filter(entry => entry.localId !== localId));
+  }
+
+  function handleRemovePending(localId: string) {
+    setPendingEntries(prev => prev.filter(entry => entry.localId !== localId));
   }
 
   async function handleRemoveSavedVendor(vendorId: string) {
     await removeVendorMutation.mutateAsync(vendorId);
   }
 
-  const canGoToStep3 = savedVendors.length >= 2 && pendingFormIds.length === 0;
+  const canGoToStep3 = savedVendors.length >= 2 && pendingEntries.length === 0;
 
   // ---------------------------------------------------------------------------
   // Step 3 — submit
@@ -380,27 +430,59 @@ export default function EvaluasiStepper() {
               />
             ))}
 
-            {pendingFormIds.map((localId) => (
-              <VendorInputCard
-                key={localId}
-                vendor={null}
-                mode="manual"
-                onRemove={() => setPendingFormIds(prev => prev.filter(id => id !== localId))}
-                onSave={(payload) => handleSaveVendor(localId, payload)}
-              />
-            ))}
+            {pendingEntries.map((entry) =>
+              entry.kind === 'manual' ? (
+                <VendorInputCard
+                  key={entry.localId}
+                  vendor={null}
+                  mode="manual"
+                  onRemove={() => handleRemovePending(entry.localId)}
+                  onSave={(payload) => handleSaveVendor(entry.localId, payload)}
+                />
+              ) : (
+                <UploadVendorCard
+                  key={entry.localId}
+                  evaluasiId={evaluasiId!}
+                  uploadId={entry.uploadId}
+                  fileName={entry.fileName}
+                  uploadError={entry.uploadError}
+                  onRemove={() => handleRemovePending(entry.localId)}
+                  onSave={(payload) => handleSaveVendor(entry.localId, payload)}
+                />
+              )
+            )}
 
-            {savedVendors.length + pendingFormIds.length < 10 && (
-              <button
-                type="button"
-                onClick={addPendingForm}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl
-                  border border-dashed border-white/20 text-sm text-gray-400
-                  hover:text-white hover:border-white/40 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Tambah Vendor Manual
-              </button>
+            {savedVendors.length + pendingEntries.length < 10 && (
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={addPendingForm}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl
+                    border border-dashed border-white/20 text-sm text-gray-400
+                    hover:text-white hover:border-white/40 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Tambah Vendor Manual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl
+                    border border-dashed border-white/20 text-sm text-gray-400
+                    hover:text-white hover:border-white/40 transition-colors"
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload Dokumen Penawaran
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.xlsx,.xls,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                  onChange={handleFileInputChange}
+                  className="hidden"
+                  data-testid="dokumen-file-input"
+                />
+              </div>
             )}
           </div>
 

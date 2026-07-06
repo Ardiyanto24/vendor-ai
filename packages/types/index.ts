@@ -123,3 +123,44 @@ export interface AddVendorPayload {
   catatan?: string;
   sumberInput: 'manual' | 'extracted';
 }
+
+// Dokumen upload & ekstraksi (F-07)
+export type StatusEkstraksi = 'pending' | 'processing' | 'done' | 'done_partial' | 'failed';
+
+export type IndexingRagStatus = 'pending' | 'processing' | 'done' | 'failed' | 'skipped_no_text';
+
+export interface EkstraksiField<T> {
+  nilai: T | null;
+  confidence: number;
+}
+
+// Struktur JSON hasil ekstraksi AI — lihat AI-02 section 7.2
+export interface HasilEkstraksi {
+  nama_perusahaan: EkstraksiField<string>;
+  harga_penawaran: EkstraksiField<number> & { mata_uang?: string };
+  kontak: EkstraksiField<string>;
+  spesifikasi_ditawarkan: EkstraksiField<string[]>;
+  masa_garansi: EkstraksiField<string>;
+  payment_terms: EkstraksiField<string>;
+  catatan_ekstraksi?: string | null;
+  confidence_overall: number;
+}
+
+export interface UploadDokumenResponse {
+  uploadId: string;
+  evaluasiId: string;
+  fileType: 'pdf' | 'excel';
+  fileSizeBytes: number;
+  statusEkstraksi: StatusEkstraksi;
+  createdAt: string;
+}
+
+export interface DokumenStatusResponse {
+  uploadId: string;
+  status: StatusEkstraksi;
+  hasilEkstraksi: HasilEkstraksi | null;
+  confidenceScore: number | null;
+  indexingRagStatus: IndexingRagStatus | null;
+  chunkCount: number | null;
+  updatedAt: string;
+}

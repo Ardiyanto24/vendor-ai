@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { server } from '@/test/server';
 import { resetMockEvaluasiState } from '@/test/handlers/evaluasi';
+import { resetMockDokumenState, seedMockDokumen } from '@/test/handlers/dokumen';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -16,8 +17,21 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/evaluasi/baru',
 }));
 
+// jsdom's FormData doesn't interop cleanly with undici's fetch, so the
+// multipart upload POST can't run through MSW in this environment — mock the
+// upload call itself and drive the rest of the flow (polling) through the
+// real GET status handler.
+vi.mock('@/lib/api/evaluasi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api/evaluasi')>();
+  return { ...actual, uploadDokumen: vi.fn() };
+});
+
+// eslint-disable-next-line import/first
+import { uploadDokumen } from '@/lib/api/evaluasi';
 // eslint-disable-next-line import/first
 import EvaluasiStepper from '../EvaluasiStepper';
+
+const mockedUploadDokumen = vi.mocked(uploadDokumen);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -60,6 +74,8 @@ afterEach(() => {
   server.resetHandlers();
   pushMock.mockClear();
   resetMockEvaluasiState();
+  resetMockDokumenState();
+  mockedUploadDokumen.mockReset();
 });
 afterAll(() => server.close());
 
@@ -186,5 +202,104 @@ describe('EvaluasiStepper', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /batal/i }));
     expect(screen.queryByTestId('vendor-input-form')).not.toBeInTheDocument();
+  });
+
+  test('step 2: shows "Upload Dokumen Penawaran" button', async () => {
+    renderStepper();
+    await goToStep2();
+
+    expect(screen.getByRole('button', { name: /Upload Dokumen Penawaran/i })).toBeInTheDocument();
+  });
+
+  test(
+    'step 2: uploading a document shows loading then a pre-filled extracted card',
+    async () => {
+      seedMockDokumen('upload-test-1', 'new-eval-1', 'penawaran-vendor-a.pdf');
+      mockedUploadDokumen.mockResolvedValueOnce({
+        uploadId:        'upload-test-1',
+        evaluasiId:      'new-eval-1',
+        fileType:        'pdf',
+        fileSizeBytes:   1234,
+        statusEkstraksi: 'pending',
+        createdAt:       new Date().toISOString(),
+      });
+
+      renderStepper();
+      await goToStep2();
+
+      const file = new File(['dummy content'], 'penawaran-vendor-a.pdf', { type: 'application/pdf' });
+      const fileInput = screen.getByTestId('dokumen-file-input') as HTMLInputElement;
+      await userEvent.upload(fileInput, file);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('vendor-card-loading')).toBeInTheDocument();
+      });
+      expect(screen.getByText('penawaran-vendor-a.pdf')).toBeInTheDocument();
+
+      await waitFor(
+        () => {
+          expect(screen.getByTestId('vendor-input-form')).toBeInTheDocument();
+        },
+        { timeout: 12_000 }
+      );
+
+      expect(screen.getByDisplayValue('PT Ekstraksi Otomatis')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /konfirmasi/i })).toBeInTheDocument();
+    },
+    15_000
+  );
+
+  test(
+    'step 2: extraction failure shows error mode with manual fallback',
+    async () => {
+      seedMockDokumen('upload-test-2', 'new-eval-1', 'penawaran-gagal.pdf', true);
+      mockedUploadDokumen.mockResolvedValueOnce({
+        uploadId:        'upload-test-2',
+        evaluasiId:      'new-eval-1',
+        fileType:        'pdf',
+        fileSizeBytes:   1234,
+        statusEkstraksi: 'pending',
+        createdAt:       new Date().toISOString(),
+      });
+
+      renderStepper();
+      await goToStep2();
+
+      const file = new File(['dummy content'], 'penawaran-gagal.pdf', { type: 'application/pdf' });
+      const fileInput = screen.getByTestId('dokumen-file-input') as HTMLInputElement;
+      await userEvent.upload(fileInput, file);
+
+      await waitFor(
+        () => {
+          expect(screen.getByTestId('vendor-card-error')).toBeInTheDocument();
+        },
+        { timeout: 12_000 }
+      );
+
+      await userEvent.click(screen.getByTestId('btn-input-manual'));
+      expect(screen.getByTestId('vendor-input-form')).toBeInTheDocument();
+    },
+    15_000
+  );
+
+  test('step 2: upload rejected by the server shows error mode with manual fallback', async () => {
+    mockedUploadDokumen.mockRejectedValueOnce(
+      new Error('Format file tidak didukung. Hanya PDF dan Excel (.xlsx, .xls) yang diizinkan')
+    );
+
+    renderStepper();
+    await goToStep2();
+
+    const file = new File(['dummy'], 'penawaran.txt', { type: 'text/plain' });
+    const fileInput = screen.getByTestId('dokumen-file-input') as HTMLInputElement;
+    // The real <input accept> attribute would filter this out at the browser
+    // level; disable that here to exercise the server-side rejection path.
+    const user = userEvent.setup({ applyAccept: false });
+    await user.upload(fileInput, file);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('vendor-card-error')).toBeInTheDocument();
+    });
+    expect(screen.getByText(/format file tidak didukung/i)).toBeInTheDocument();
   });
 });
