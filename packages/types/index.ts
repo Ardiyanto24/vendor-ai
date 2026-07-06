@@ -124,6 +124,25 @@ export interface AddVendorPayload {
   sumberInput: 'manual' | 'extracted';
 }
 
+// Approval workflow (F-09)
+export type ApprovalKeputusan = 'approved' | 'rejected';
+
+export interface ApprovalLog {
+  id: string;
+  evaluasi_id: string;
+  manager_id: string;
+  keputusan: ApprovalKeputusan;
+  komentar?: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+}
+
+export interface SubmitApprovalPayload {
+  keputusan: ApprovalKeputusan;
+  komentar?: string;
+}
+
 // Dokumen upload & ekstraksi (F-07)
 export type StatusEkstraksi = 'pending' | 'processing' | 'done' | 'done_partial' | 'failed';
 

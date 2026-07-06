@@ -8,6 +8,7 @@ import type {
   Vendor,
   UploadDokumenResponse,
   DokumenStatusResponse,
+  ApprovalKeputusan,
 } from 'types';
 
 export interface EvaluasiListFilters {
@@ -112,4 +113,21 @@ export async function getDokumenStatus(
   return apiFetch<DokumenStatusResponse>(
     `/api/v1/evaluasi/${evaluasiId}/dokumen/${uploadId}/status`
   );
+}
+
+export async function kirimKeApproval(evaluasiId: string): Promise<Evaluasi> {
+  return apiFetch<Evaluasi>(`/api/v1/evaluasi/${evaluasiId}/status`, {
+    method: 'PATCH',
+  });
+}
+
+export async function submitApproval(
+  evaluasiId: string,
+  keputusan: ApprovalKeputusan,
+  komentar?: string
+): Promise<Evaluasi> {
+  return apiFetch<Evaluasi>(`/api/v1/evaluasi/${evaluasiId}/approval`, {
+    method: 'POST',
+    body: JSON.stringify({ keputusan, komentar }),
+  });
 }

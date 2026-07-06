@@ -24,7 +24,7 @@ Kolom `AI` diisi hanya untuk fitur yang menyentuh `vendor-ai-agent` — isi `—
 | F-06 Buat Evaluasi | ✅ | ✅ | ✅ | — | |
 | F-07 Upload & Ekstraksi | ✅ | ✅ | 🔄 | ✅ | FE selesai & diverifikasi via MSW (unit + manual), belum di-switch ke staging API nyata |
 | F-08 Form Preferensi | ✅ | ✅ | 🔄 | — | DB (kolom `preferensi_perusahaan`) & BE (validasi `PREFERENCE_TOO_LONG`) sudah ada sejak F-04/F-06; FE `PreferenceInput` baru ditambahkan, diverifikasi via unit test (MSW), belum di-switch ke staging API nyata |
-| F-09 Submit & Approval | — | — | — | — | |
+| F-09 Submit & Approval | 🔄 | 🔄 | 🔄 | — | Migration `approval_log` dibuat tapi belum di-`db push` — project dev `ai-vendor-dev` berstatus paused/inactive di Supabase, perlu di-resume manual dari dashboard sebelum push; BE (`PATCH .../status`, `POST .../approval`) sudah diimplementasi & lulus typecheck, menunggu tabel live untuk verifikasi end-to-end; FE (P-05 placeholder, P-07 tabs + ApprovalCard) selesai & diverifikasi via MSW (unit test), belum di-switch ke staging API nyata |
 | F-10 AI Processing | — | — | — | — | Koordinasi AI Engineer |
 | F-11 Hasil TOPSIS | — | — | — | — | Koordinasi AI Engineer |
 | F-12 Profil Kualitatif | — | — | — | — | Koordinasi AI Engineer |

@@ -161,16 +161,20 @@ let _evalCounter = 0;
 let _vendorCounter = 0;
 const _newEvaluasiMap = new Map<string, MockEvaluasi>();
 const _vendorsByEvaluasi = new Map<string, MockVendor[]>();
+const _statusOverrides = new Map<string, EvaluasiStatus>();
 
 export function resetMockEvaluasiState() {
   _evalCounter = 0;
   _vendorCounter = 0;
   _newEvaluasiMap.clear();
   _vendorsByEvaluasi.clear();
+  _statusOverrides.clear();
 }
 
 function getAllEvaluasi(): MockEvaluasi[] {
-  return [...MOCK_EVALUASI, ...Array.from(_newEvaluasiMap.values())];
+  return [...MOCK_EVALUASI, ...Array.from(_newEvaluasiMap.values())].map((e) =>
+    _statusOverrides.has(e.id) ? { ...e, status: _statusOverrides.get(e.id)! } : e
+  );
 }
 
 function getVendors(evaluasiId: string): MockVendor[] {
@@ -388,6 +392,70 @@ export const handlers = [
     return HttpResponse.json(
       { success: true, data: { evaluasiId, message: 'Proses evaluasi AI telah dimulai' } },
       { status: 202 }
+    );
+  }),
+
+  // PATCH /api/v1/evaluasi/:id/status — staff kirim evaluasi 'selesai' ke approval
+  http.patch('http://localhost:3001/api/v1/evaluasi/:id/status', ({ params }) => {
+    const evaluasiId = params.id as string;
+    const evaluasi = getAllEvaluasi().find(e => e.id === evaluasiId);
+
+    if (!evaluasi) {
+      return HttpResponse.json(
+        { success: false, error: { code: 'EVALUASI_NOT_FOUND', message: 'Evaluasi tidak ditemukan' } },
+        { status: 404 }
+      );
+    }
+
+    if (evaluasi.status !== 'selesai') {
+      return HttpResponse.json(
+        { success: false, error: { code: 'NOT_PENDING_APPROVAL', message: 'Evaluasi hanya bisa dikirim ke approval setelah statusnya selesai' } },
+        { status: 409 }
+      );
+    }
+
+    _statusOverrides.set(evaluasiId, 'menunggu_approval');
+
+    return HttpResponse.json(
+      { success: true, data: { ...evaluasi, status: 'menunggu_approval' } },
+      { status: 200 }
+    );
+  }),
+
+  // POST /api/v1/evaluasi/:id/approval — manager approve/reject
+  http.post('http://localhost:3001/api/v1/evaluasi/:id/approval', async ({ params, request }) => {
+    const evaluasiId = params.id as string;
+    const evaluasi = getAllEvaluasi().find(e => e.id === evaluasiId);
+
+    if (!evaluasi) {
+      return HttpResponse.json(
+        { success: false, error: { code: 'EVALUASI_NOT_FOUND', message: 'Evaluasi tidak ditemukan' } },
+        { status: 404 }
+      );
+    }
+
+    if (evaluasi.status !== 'menunggu_approval') {
+      return HttpResponse.json(
+        { success: false, error: { code: 'NOT_PENDING_APPROVAL', message: 'Evaluasi tidak dalam status menunggu approval' } },
+        { status: 409 }
+      );
+    }
+
+    const body = await request.json() as { keputusan: 'approved' | 'rejected'; komentar?: string | null };
+
+    if (body.keputusan === 'rejected' && (!body.komentar || body.komentar.trim() === '')) {
+      return HttpResponse.json(
+        { success: false, error: { code: 'VALIDATION_ERROR', message: 'Komentar wajib diisi saat menolak evaluasi' } },
+        { status: 400 }
+      );
+    }
+
+    const newStatus: EvaluasiStatus = body.keputusan === 'approved' ? 'approved' : 'butuh_revisi';
+    _statusOverrides.set(evaluasiId, newStatus);
+
+    return HttpResponse.json(
+      { success: true, data: { ...evaluasi, status: newStatus } },
+      { status: 200 }
     );
   }),
 ];
