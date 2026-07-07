@@ -19,21 +19,38 @@ const AGENT_KEYS = [
 
 const MIN_VENDORS = 2;
 
-// Fire-and-forget to FastAPI. F-06 stub — FastAPI not yet implemented (F-10).
-async function triggerFastAPI(evaluasiId: string, payload: unknown): Promise<void> {
-  const fastApiUrl = process.env.FASTAPI_BASE_URL;
-  if (!fastApiUrl) return;
+// F-10: real call to FastAPI orchestration start endpoint. Awaited — if the
+// AI service is unreachable or errors, the submit itself must fail so the
+// evaluasi doesn't get stuck in 'processing' with no agent ever running.
+async function startAgentPipeline(evaluasiId: string, payload: unknown): Promise<{ ok: true } | { ok: false }> {
+  const fastApiUrl   = process.env.FASTAPI_BASE_URL;
+  const serviceToken = process.env.SERVICE_TO_SERVICE_TOKEN;
+
+  if (!fastApiUrl) {
+    console.error(`[submit] FASTAPI_BASE_URL tidak dikonfigurasi — tidak bisa memulai pipeline untuk evaluasi ${evaluasiId}`);
+    return { ok: false };
+  }
 
   try {
-    await fetch(`${fastApiUrl}/v1/agent/evaluasi/${evaluasiId}/start`, {
+    const response = await fetch(`${fastApiUrl}/v1/agent/evaluasi/${evaluasiId}/start`, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(payload),
-      signal:  AbortSignal.timeout(5000),
+      headers: {
+        'Content-Type': 'application/json',
+        ...(serviceToken ? { 'X-Service-Token': serviceToken } : {}),
+      },
+      body:   JSON.stringify(payload),
+      signal: AbortSignal.timeout(5000),
     });
-  } catch {
-    // Expected in F-06 since FastAPI is not yet deployed. Log and continue.
-    console.warn(`[submit] FastAPI not reachable for evaluasi ${evaluasiId} — stub mode`);
+
+    if (!response.ok) {
+      console.error(`[submit] FastAPI merespons ${response.status} untuk evaluasi ${evaluasiId}`);
+      return { ok: false };
+    }
+
+    return { ok: true };
+  } catch (err) {
+    console.error(`[submit] FastAPI tidak dapat dijangkau untuk evaluasi ${evaluasiId}:`, err);
+    return { ok: false };
   }
 }
 
@@ -163,7 +180,8 @@ export async function POST(
       );
     }
 
-    // 3. Fire-and-forget FastAPI call — do not await
+    // 3. Call FastAPI to start the agent pipeline — awaited, since submit must
+    // fail (not silently continue) if the AI service can't accept the job.
     const fastApiPayload = {
       evaluasiId,
       judul:                 evaluasi.judul,
@@ -183,7 +201,19 @@ export async function POST(
       konfigurasiKriteria: { kriteria: konfigurasi?.kriteria ?? [] },
     };
 
-    void triggerFastAPI(evaluasiId, fastApiPayload);
+    const pipelineResult = await startAgentPipeline(evaluasiId, fastApiPayload);
+
+    if (!pipelineResult.ok) {
+      // Rollback: evaluasi kembali ke 'draft' dan hapus row agent_progress yang baru dibuat,
+      // supaya user bisa submit ulang tanpa state yang tidak konsisten.
+      await supabase.from('agent_progress').delete().eq('evaluasi_id', evaluasiId);
+      await supabase.from('evaluasi').update({ status: 'draft' }).eq('id', evaluasiId);
+
+      return NextResponse.json(
+        { success: false, error: { code: 'AGENT_SERVICE_ERROR', message: 'Layanan AI tidak dapat dijangkau. Silakan coba lagi.' } },
+        { status: 503, headers: SECURITY_HEADERS }
+      );
+    }
 
     return NextResponse.json(
       {
