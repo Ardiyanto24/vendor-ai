@@ -42,7 +42,7 @@ export default function LoginForm() {
     const validation = loginSchema.safeParse(data);
     if (!validation.success) {
       validation.error.issues.forEach((issue) => {
-        setError(issue.path[0] as any, {
+        setError(issue.path[0] as keyof LoginFormValues, {
           message: issue.message,
         });
       });
@@ -68,9 +68,10 @@ export default function LoginForm() {
       // Redirect to dashboard
       router.push('/dashboard');
       router.refresh();
-    } catch (err: any) {
+    } catch (err) {
       console.error('Login error:', err);
-      const code = err.code || 'UNKNOWN_ERROR';
+      const errorObj = err as { code?: string; message?: string };
+      const code = errorObj.code || 'UNKNOWN_ERROR';
       setApiError(getErrorMessage(code));
     } finally {
       setIsLoading(false);

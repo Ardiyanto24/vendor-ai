@@ -73,18 +73,170 @@ export interface Vendor {
 }
 
 // Konfigurasi Kriteria
-export interface Kriteria {
-  nama: string;
+export type KategoriPengadaan =
+  | 'it_hardware'
+  | 'it_software'
+  | 'jasa_it'
+  | 'jasa_konsultasi'
+  | 'alat_tulis_kantor';
+
+export interface KategoriPengadaanOption {
+  value: KategoriPengadaan;
+  label: string;
+}
+
+export interface KriteriaItem {
+  key: string;
+  label: string;
   bobot: number;
-  deskripsi?: string;
+  threshold_min: number;
 }
 
 export interface KonfigurasiKriteria {
   id: string;
-  kategori: string;
-  kriteria: Kriteria[];
+  kategori: KategoriPengadaan;
+  kriteria: KriteriaItem[];
   updated_by: string;
+  updated_at: string;
+}
+
+export interface EvaluasiDetail extends Evaluasi {
+  vendors: Vendor[];
+}
+
+export interface CreateEvaluasiPayload {
+  judul: string;
+  kategori: string;
+  deskripsi: string;
+  budgetMin?: number;
+  budgetMax: number;
+  deadline: string;
+  prioritasKriteria?: string[];
+  lampiranUrl?: string;
+  preferensiPerusahaan?: string;
+}
+
+export interface AddVendorPayload {
+  namaPerusahaan: string;
+  kontakAtauWebsite?: string;
+  hargaPenawaran: number;
+  catatan?: string;
+  sumberInput: 'manual' | 'extracted';
+}
+
+// Approval workflow (F-09)
+export type ApprovalKeputusan = 'approved' | 'rejected';
+
+export interface ApprovalLog {
+  id: string;
+  evaluasi_id: string;
+  manager_id: string;
+  keputusan: ApprovalKeputusan;
+  komentar?: string | null;
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
+}
+
+export interface SubmitApprovalPayload {
+  keputusan: ApprovalKeputusan;
+  komentar?: string;
+}
+
+// Dokumen upload & ekstraksi (F-07)
+export type StatusEkstraksi = 'pending' | 'processing' | 'done' | 'done_partial' | 'failed';
+
+export type IndexingRagStatus = 'pending' | 'processing' | 'done' | 'failed' | 'skipped_no_text';
+
+export interface EkstraksiField<T> {
+  nilai: T | null;
+  confidence: number;
+}
+
+// Struktur JSON hasil ekstraksi AI — lihat AI-02 section 7.2
+export interface HasilEkstraksi {
+  nama_perusahaan: EkstraksiField<string>;
+  harga_penawaran: EkstraksiField<number> & { mata_uang?: string };
+  kontak: EkstraksiField<string>;
+  spesifikasi_ditawarkan: EkstraksiField<string[]>;
+  masa_garansi: EkstraksiField<string>;
+  payment_terms: EkstraksiField<string>;
+  catatan_ekstraksi?: string | null;
+  confidence_overall: number;
+}
+
+export interface UploadDokumenResponse {
+  uploadId: string;
+  evaluasiId: string;
+  fileType: 'pdf' | 'excel';
+  fileSizeBytes: number;
+  statusEkstraksi: StatusEkstraksi;
+  createdAt: string;
+}
+
+export interface DokumenStatusResponse {
+  uploadId: string;
+  status: StatusEkstraksi;
+  hasilEkstraksi: HasilEkstraksi | null;
+  confidenceScore: number | null;
+  indexingRagStatus: IndexingRagStatus | null;
+  chunkCount: number | null;
+  updatedAt: string;
+}
+
+// Hasil evaluasi / TOPSIS scoring (F-11) — lihat DB-01 section 6.7 dan 6.8
+export type TingkatKesesuaianPreferensi = 'tinggi' | 'sedang' | 'rendah' | 'tidak_relevan';
+
+export interface UniqueOffering {
+  deskripsi: string;
+  relevansi: string;
+  sumber?: string | null;
+}
+
+// Struktur output Preference Matcher Agent — bentuk lengkap datang di F-13
+export interface PreferenceMatchingResult {
+  mode: 'netral' | 'opinionated';
+  narasi_pengantar?: string | null;
+  rekomendasi?: unknown;
+  [key: string]: unknown;
+}
+
+export interface ConflictCallout {
+  vendor_terbaik_topsis_id: string;
+  vendor_terbaik_preferensi_id: string;
+  catatan_konflik: string;
+}
+
+export interface HasilVendor {
+  id: string;
+  hasil_evaluasi_id: string;
+  vendor_id: string;
+  vendor_nama: string;
+  rank: number;
+  skor_total: number;
+  skor_per_kriteria: Record<string, number>;
+  catatan_per_kriteria?: Record<string, string> | null;
+  lolos_threshold: boolean;
+  unique_offerings?: UniqueOffering[] | null;
+  profil_kualitatif?: string | null;
+  tingkat_kesesuaian_preferensi?: TingkatKesesuaianPreferensi | null;
+}
+
+export interface HasilEvaluasi {
+  id: string;
+  evaluasi_id: string;
+  metodologi: string;
+  vendor_rekomendasi_id: string;
+  vendor_rekomendasi_nama: string;
+  reasoning_utama: string;
+  kelemahan_utama: string;
+  rekomendasi_negosiasi: string;
+  summary_komparatif_kualitatif?: string | null;
+  preference_matching_result?: PreferenceMatchingResult | null;
+  conflict_callout?: ConflictCallout | null;
+  ada_data_tidak_lengkap: boolean;
+  agent_gagal?: string[] | null;
+  calculated_at: string;
+  kriteria: KriteriaItem[];
+  vendors: HasilVendor[];
 }

@@ -11,6 +11,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   VENDOR_LIMIT_EXCEEDED: 'Jumlah vendor melebihi batas maksimal (10 vendor).',
   INSUFFICIENT_VENDORS: 'Jumlah vendor kurang dari batas minimum (minimal 2 vendor).',
   PREFERENCE_TOO_LONG: 'Form preferensi perusahaan maksimal 1.000 karakter.',
+  AGENT_SERVICE_ERROR: 'Layanan AI tidak dapat dijangkau. Silakan coba lagi beberapa saat lagi.',
 
   // Upload/File errors
   FILE_TOO_LARGE: 'Ukuran file terlalu besar. Maksimal ukuran file adalah 10MB.',

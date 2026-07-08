@@ -1,10 +1,2 @@
-import { http, HttpResponse } from 'msw';
-
-export const handlers = [
-  http.post('http://localhost:3001/api/v1/evaluasi/:id/vendor', () => {
-    return HttpResponse.json({
-      success: true,
-      data: null,
-    });
-  }),
-];
+// Vendor handlers are consolidated in evaluasi.ts (POST/DELETE /evaluasi/:id/vendor)
+export const handlers: never[] = [];

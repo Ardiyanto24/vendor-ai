@@ -61,7 +61,10 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - mockServiceWorker.js (MSW service worker script — must never be
+     *   redirected, service worker registration fails if its script
+     *   response is a redirect)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|mockServiceWorker.js).*)',
   ],
 };

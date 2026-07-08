@@ -57,7 +57,15 @@ Index dan optimasi tidak ditambahkan secara spekulatif. Setiap keputusan optimas
 
 Query ke database seharusnya untuk mengambil dan menyimpan data, bukan untuk menjalankan logika bisnis yang rumit. Kalkulasi seperti scoring TOPSIS, transformasi data kompleks, dan agregasi berat diselesaikan di level aplikasi (FastAPI) — bukan di stored procedure atau trigger.
 
-**Pengecualian yang diizinkan:** Constraint validasi sederhana, trigger untuk `updated_at` otomatis, dan RLS policy yang menggunakan fungsi bawaan PostgreSQL.
+**Pengecualian yang diizinkan:** Constraint validasi sederhana, trigger untuk `updated_at` otomatis, RLS policy yang menggunakan fungsi bawaan PostgreSQL, dan **koordinator penulisan atomik lintas tabel** (lihat ADR-037 di SH-01).
+
+Kategori terakhir berlaku untuk kasus di mana aplikasi mengakses Supabase lewat service-role key via PostgREST (pola akses standar di sistem ini — lihat AI-01 untuk `agent_progress`) dan butuh menulis ke beberapa tabel sekaligus secara atomik, sesuatu yang tidak bisa dicapai lewat beberapa call REST terpisah karena masing-masing atomik sendiri-sendiri tapi tidak atomik sebagai grup. Function semacam ini **wajib** memenuhi semua syarat berikut, atau tidak termasuk pengecualian ini:
+- Hanya berisi `INSERT`/`UPDATE`/soft-`DELETE` terstruktur dari payload yang sudah lengkap dari caller — tidak boleh melakukan kalkulasi, keputusan bisnis, atau transformasi data yang berarti (skor, agregasi, dsb tetap dihitung di level aplikasi sebelum dikirim ke function).
+- `SECURITY DEFINER` dengan `search_path` dikunci eksplisit ke `public` (mencegah search-path hijacking).
+- `EXECUTE` di-`REVOKE` dari `PUBLIC`/`authenticated`/`anon` dan hanya di-`GRANT` ke `service_role`.
+- Mengikuti aturan soft-delete yang sama dengan seluruh sistem (ADR-019) — tidak ada `DELETE` permanen di dalam function.
+
+Contoh implementasi: `fn_simpan_hasil_evaluasi` (F-11 Scoring Engine, ADR-037) — menulis `hasil_evaluasi` + `hasil_vendor` dan mengubah `evaluasi.status` menjadi `selesai` dalam satu transaksi.
 
 ### 3.3 Hindari N+1 query
 
