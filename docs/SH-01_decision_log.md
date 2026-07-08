@@ -65,6 +65,7 @@ Dokumen ini ditulis untuk **orang yang bergabung belakangan** — engineer baru,
 | ADR-034 | Teknis | Google Gemini text-embedding-004 sebagai embedding model untuk RAG | 2026-06-13 |
 | ADR-035 | Dokumentasi | Namespace AI terpisah untuk dokumen spesifikasi AI Engineer | 2026-06-13 |
 | ADR-036 | Tim | Dua track pengerjaan: Fullstack Engineer + AI Engineer (solo developer) | 2026-06-13 |
+| ADR-037 | Teknis | RPC atomik `fn_simpan_hasil_evaluasi` sebagai pengecualian larangan stored procedure | 2026-07-08 |
 
 ---
 
@@ -1123,6 +1124,34 @@ Branching strategy di `vendor-ai` disederhanakan dari dua develop branch (`fe/de
 
 ---
 
+### ADR-037 — RPC atomik `fn_simpan_hasil_evaluasi` sebagai pengecualian larangan stored procedure
+
+**Tanggal:** 2026-07-08 | **Kategori:** Teknis
+
+**Konteks:**
+F-11 (Scoring Engine di `vendor-ai-agent`) perlu menulis `hasil_evaluasi` + seluruh `hasil_vendor`, lalu mengubah `evaluasi.status` menjadi `selesai`, dalam satu operasi atomik — AI-03 §13 secara eksplisit melarang penyimpanan output parsial ke database. Namun FastAPI mengakses Supabase lewat service-role key via PostgREST (pola yang sama dipakai untuk semua tulisan lain di sistem ini, termasuk `agent_progress`), dan PostgREST tidak mendukung transaksi lintas tabel dalam satu call REST — tiga `INSERT`/`UPDATE` terpisah masing-masing atomik sendiri-sendiri, tapi tidak atomik sebagai grup. Di sisi lain, DB-03 §3.2 melarang stored procedure untuk logika bisnis, dengan pengecualian sempit: validasi sederhana, trigger `updated_at`, dan RLS policy berbasis fungsi bawaan PostgreSQL — daftar itu tidak mencakup kasus koordinasi tulis lintas tabel ini, sehingga dua dokumen ini saling bertentangan untuk kasus spesifik F-11.
+
+**Keputusan:**
+Menambahkan pengecualian eksplisit ke DB-03 §3.2 untuk **koordinator penulisan atomik lintas tabel** — sebuah Postgres function yang hanya menyusun ulang `INSERT`/`UPDATE`/soft-`DELETE` lintas tabel dari payload JSONB yang sudah lengkap dari aplikasi, tanpa kalkulasi, keputusan bisnis, atau transformasi data yang berarti. `fn_simpan_hasil_evaluasi` (migrasi `20260620090000`) adalah implementasi pertama pola ini: `SECURITY DEFINER` dengan `search_path` dikunci ke `public`, `EXECUTE` hanya diberikan ke `service_role` (di-`REVOKE` dari `PUBLIC`/`authenticated`/`anon`), dan baris `hasil_vendor` lama di-soft-delete (`deleted_at = NOW()`) sebelum baris baru ditulis — bukan `DELETE` permanen, mengikuti ADR-019.
+
+**Alternatif yang ditolak:**
+
+*FastAPI membuka koneksi Postgres langsung (bukan lewat service-role REST API) untuk transaksi `BEGIN`/`COMMIT` asli di level aplikasi:* Ditolak karena memperkenalkan mekanisme akses database baru yang tidak dipakai di bagian arsitektur manapun sejauh ini — semua tulisan lain (termasuk `agent_progress` di F-10) lewat service-role key via Supabase client/PostgREST. Menambah credential dan connection pool terpisah hanya untuk satu use case tidak sepadan dengan manfaatnya.
+
+*RPC hanya menangani `hasil_evaluasi` + `hasil_vendor`; update `evaluasi.status` tetap terpisah lewat PostgREST biasa:* Ditolak karena membuka window ketidakkonsistenan singkat antara hasil tersimpan dan status evaluasi — bertentangan dengan semangat "tidak boleh ada state parsial" yang menjadi alasan RPC ini dibuat. BE-03 §5.1 juga sudah mendefinisikan kedua langkah ini sebagai satu urutan yang dilakukan Orchestrator.
+
+*Terima risiko partial write, tangani lewat compensating rollback di level aplikasi:* Ditolak karena AI-03 §13 secara eksplisit melarang penyimpanan output parsial, dan compensating rollback dari luar transaksi database tetap berisiko race condition jika proses FastAPI crash di antara langkah-langkah tulis.
+
+**Alasan:**
+Pola "Postgres function sebagai transaction boundary untuk client yang hanya punya akses REST" adalah pendekatan standar Supabase untuk kasus atomic multi-table write — bukan penyimpangan dari prinsip "database bukan tempat logika bisnis" di DB-03 §3.2, melainkan penerapan sempit yang tetap menjaga batasnya: function ini tidak pernah melakukan kalkulasi (skor TOPSIS tetap dihitung di Python/FastAPI sesuai AI-03), hanya mengoordinasikan penulisan output yang sudah final ke tiga tabel sekaligus.
+
+**Konsekuensi:**
+DB-03 §3.2 diperbarui dengan syarat eksplisit untuk pengecualian ini: function hanya boleh berisi `INSERT`/`UPDATE`/soft-`DELETE` terstruktur dari payload yang sudah lengkap, tidak boleh mengandung kalkulasi atau keputusan bisnis, harus `SECURITY DEFINER` dengan `search_path` dikunci, dan `EXECUTE` harus dibatasi ke `service_role` saja. `hasil_vendor` tidak lagi ditulis lewat `INSERT` PostgREST langsung dari FastAPI — semua tulisan hasil scoring (F-11 dan kolom tambahan F-12/F-13 nanti) lewat RPC ini. Fungsi serupa di masa depan (jika ada kebutuhan atomic write lintas tabel lain) harus mengikuti checklist yang sama.
+
+**Dokumen terkait:** DB-03, AI-03, DB-01, DB-02, BE-03
+
+---
+
 *Dokumen ini adalah living document — setiap keputusan signifikan baru yang diambil selama development harus ditambahkan ke log ini.*
 
 ---
@@ -1137,3 +1166,4 @@ Branching strategy di `vendor-ai` disederhanakan dari dua develop branch (`fe/de
 | 4.0.0 | 2026-06-12 | Tambah ADR-032 (empat role developer: pisah Backend Engineer menjadi Backend Engineer dan AI Engineer) | — |
 | 5.0.0 | 2026-06-13 | Tambah ADR-033 (DeepSeek-V4-Flash via OpenRouter menggantikan Claude Sonnet); tambah ADR-034 (Google Gemini text-embedding-004 menggantikan OpenAI text-embedding-3-small); tandai ADR-015 dan ADR-028 sebagai Superseded | — |
 | 6.0.0 | 2026-06-13 | Tambah ADR-035 (namespace AI terpisah: BE-03/04/05/08/09/10 → AI-01 s/d AI-06); tambah ADR-036 (dua track solo developer: Fullstack + AI Engineer, menggantikan ADR-032); tandai ADR-032 sebagai Superseded; perbarui referensi dokumen terkait di ADR-033 dan ADR-034 | — |
+| 7.0.0 | 2026-07-08 | Tambah ADR-037 (RPC atomik `fn_simpan_hasil_evaluasi` sebagai pengecualian eksplisit larangan stored procedure di DB-03 §3.2, untuk atomic multi-table write F-11 Scoring Engine) | — |
