@@ -533,6 +533,7 @@ Setiap error yang dikembalikan API harus:
 | `RATE_LIMIT_EXCEEDED` | 429 | Terlalu banyak request dalam waktu singkat |
 | `PREFERENCE_TOO_LONG` | 400 | Teks preferensi melebihi batas 1.000 karakter |
 | `RAG_INDEX_NOT_READY` | 409 | Dokumen belum selesai diindeks, chat berbasis dokumen belum tersedia |
+| `HASIL_NOT_FOUND` | 404 | Belum ada `hasil_evaluasi` untuk evaluasi ini — proses AI belum selesai |
 
 ---
 
