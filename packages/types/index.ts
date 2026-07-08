@@ -183,3 +183,60 @@ export interface DokumenStatusResponse {
   chunkCount: number | null;
   updatedAt: string;
 }
+
+// Hasil evaluasi / TOPSIS scoring (F-11) — lihat DB-01 section 6.7 dan 6.8
+export type TingkatKesesuaianPreferensi = 'tinggi' | 'sedang' | 'rendah' | 'tidak_relevan';
+
+export interface UniqueOffering {
+  deskripsi: string;
+  relevansi: string;
+  sumber?: string | null;
+}
+
+// Struktur output Preference Matcher Agent — bentuk lengkap datang di F-13
+export interface PreferenceMatchingResult {
+  mode: 'netral' | 'opinionated';
+  narasi_pengantar?: string | null;
+  rekomendasi?: unknown;
+  [key: string]: unknown;
+}
+
+export interface ConflictCallout {
+  vendor_terbaik_topsis_id: string;
+  vendor_terbaik_preferensi_id: string;
+  catatan_konflik: string;
+}
+
+export interface HasilVendor {
+  id: string;
+  hasil_evaluasi_id: string;
+  vendor_id: string;
+  vendor_nama: string;
+  rank: number;
+  skor_total: number;
+  skor_per_kriteria: Record<string, number>;
+  catatan_per_kriteria?: Record<string, string> | null;
+  lolos_threshold: boolean;
+  unique_offerings?: UniqueOffering[] | null;
+  profil_kualitatif?: string | null;
+  tingkat_kesesuaian_preferensi?: TingkatKesesuaianPreferensi | null;
+}
+
+export interface HasilEvaluasi {
+  id: string;
+  evaluasi_id: string;
+  metodologi: string;
+  vendor_rekomendasi_id: string;
+  vendor_rekomendasi_nama: string;
+  reasoning_utama: string;
+  kelemahan_utama: string;
+  rekomendasi_negosiasi: string;
+  summary_komparatif_kualitatif?: string | null;
+  preference_matching_result?: PreferenceMatchingResult | null;
+  conflict_callout?: ConflictCallout | null;
+  ada_data_tidak_lengkap: boolean;
+  agent_gagal?: string[] | null;
+  calculated_at: string;
+  kriteria: KriteriaItem[];
+  vendors: HasilVendor[];
+}
